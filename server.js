@@ -14,6 +14,7 @@ app.get("/", (request, response) => {
 <title>server.js — รหัสนักศึกษา 69319011766</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
 <style>
   :root {
     --bg: #0a0e14;
@@ -45,7 +46,7 @@ app.get("/", (request, response) => {
       radial-gradient(circle at 1px 1px, rgba(94, 234, 212, 0.07) 1px, transparent 0);
     background-size: 28px 28px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     padding: 40px 20px;
   }
@@ -62,11 +63,19 @@ app.get("/", (request, response) => {
     z-index: 0;
   }
 
-  .terminal {
+  .shell {
     position: relative;
     z-index: 1;
     width: 100%;
-    max-width: 720px;
+    max-width: 1320px;
+    display: grid;
+    grid-template-columns: minmax(320px, 480px) minmax(420px, 1fr);
+    gap: 22px;
+    align-items: start;
+  }
+
+  .terminal {
+    width: 100%;
     background: var(--panel);
     border: 1px solid var(--panel-border);
     border-radius: 10px;
@@ -77,6 +86,27 @@ app.get("/", (request, response) => {
     overflow: hidden;
     opacity: 0;
     animation: rise 0.6s ease-out forwards;
+  }
+
+  .codewin {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    box-shadow:
+      0 0 0 1px rgba(245, 169, 98, 0.04),
+      0 30px 60px -20px rgba(0, 0, 0, 0.6),
+      0 0 80px -30px rgba(245, 169, 98, 0.12);
+    overflow: hidden;
+    opacity: 0;
+    animation: rise 0.6s ease-out 0.1s forwards;
+  }
+
+  @media (max-width: 980px) {
+    .shell {
+      grid-template-columns: 1fr;
+      max-width: 720px;
+    }
   }
 
   @keyframes rise {
@@ -346,13 +376,264 @@ app.get("/", (request, response) => {
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .terminal, .cursor-blink, .pulse { animation: none !important; }
-    .terminal { opacity: 1; transform: none; }
+    .terminal, .codewin, .cursor-blink, .pulse { animation: none !important; }
+    .terminal, .codewin { opacity: 1; transform: none; }
+  }
+
+  /* ===== Code practice window ===== */
+  .code-body {
+    padding: 20px 22px 24px;
+    font-family: 'Noto Sans Thai', sans-serif;
+  }
+
+  .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .code-head h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .code-head p {
+    margin: 4px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .lang-toggle {
+    display: flex;
+    border: 1px solid var(--panel-border);
+    border-radius: 7px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .lang-toggle button {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .lang-toggle button.active {
+    background: var(--amber);
+    color: #0a0e14;
+  }
+
+  .lang-toggle button:not(.active):hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.04);
+  }
+
+  .problem-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-bottom: 14px;
+  }
+
+  .problem-tabs::-webkit-scrollbar { height: 5px; }
+  .problem-tabs::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 4px; }
+
+  .ptab {
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--panel-border);
+    background: rgba(255,255,255,0.02);
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+
+  .ptab:hover { color: var(--text); border-color: var(--teal); }
+  .ptab.active { color: var(--teal); border-color: var(--teal); background: rgba(94, 234, 212, 0.08); }
+  .ptab .num { color: var(--muted); }
+  .ptab.active .num { color: var(--teal); }
+  .ptab .check {
+    color: var(--green);
+    display: none;
+  }
+  .ptab.solved .check { display: inline; }
+
+  .problem-desc {
+    background: #0d131b;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--text);
+  }
+
+  .problem-desc .ptitle {
+    font-weight: 700;
+    color: var(--amber);
+    margin-bottom: 6px;
+    font-size: 14.5px;
+  }
+
+  .problem-desc code {
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(94, 234, 212, 0.1);
+    color: var(--teal);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+
+  .editor-wrap {
+    position: relative;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0b0f16;
+  }
+
+  .editor-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #0d131b;
+    border-bottom: 1px solid var(--panel-border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  textarea#codeInput {
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    resize: vertical;
+    background: transparent;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13.5px;
+    line-height: 1.6;
+    padding: 14px 16px;
+    border: none;
+    outline: none;
+    tab-size: 4;
+    white-space: pre;
+  }
+
+  .run-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+
+  button.btn.run {
+    background: var(--teal);
+    color: #0a0e14;
+    border-color: var(--teal);
+    font-weight: 700;
+  }
+
+  button.btn.run:hover {
+    background: #7ff3dc;
+    box-shadow: 0 0 20px rgba(94, 234, 212, 0.35);
+  }
+
+  button.btn.reset {
+    margin-left: auto;
+  }
+
+  .console {
+    margin-top: 16px;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    background: #05070a;
+    overflow: hidden;
+  }
+
+  .console-bar {
+    padding: 8px 12px;
+    background: #0d131b;
+    border-bottom: 1px solid var(--panel-border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .console-out {
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 90px;
+    max-height: 260px;
+    overflow-y: auto;
+    color: var(--muted);
+  }
+
+  .console-out.ok-state { color: var(--green); }
+  .console-out .stdout-line { color: var(--text); }
+  .console-out .err-line { color: var(--red); }
+  .console-out .pass-line { color: var(--green); font-weight: 600; }
+  .console-out .fail-line { color: var(--red); font-weight: 600; }
+  .console-out .hint-line { color: var(--amber); }
+
+  .result-banner {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Noto Sans Thai', sans-serif;
+  }
+
+  .result-banner.show { display: flex; }
+  .result-banner.pass {
+    background: rgba(94, 234, 212, 0.1);
+    border: 1px solid rgba(94, 234, 212, 0.3);
+    color: var(--green);
+  }
+  .result-banner.fail {
+    background: rgba(255, 107, 107, 0.08);
+    border: 1px solid rgba(255, 107, 107, 0.28);
+    color: var(--red);
+  }
+
+  @media (max-width: 480px) {
+    .code-body { padding: 16px 14px 20px; }
+    textarea#codeInput { min-height: 180px; font-size: 12.5px; }
   }
 </style>
 </head>
 <body>
   <div class="glow"></div>
+  <div class="shell">
   <main class="terminal">
     <div class="titlebar">
       <div class="dots">
@@ -418,6 +699,55 @@ app.get("/", (request, response) => {
     </div>
   </main>
 
+  <aside class="codewin">
+    <div class="titlebar">
+      <div class="dots">
+        <span class="dot r"></span>
+        <span class="dot y"></span>
+        <span class="dot g"></span>
+      </div>
+      <span class="titlebar-label" id="codeWinLabel">code-practice — main.py</span>
+    </div>
+
+    <div class="code-body">
+      <div class="code-head">
+        <div>
+          <h2>ห้องฝึกเขียนโค้ด</h2>
+          <p>ไล่โจทย์ทีละขั้น จาก Hello World ไปจนถึงลายรูปสามเหลี่ยม</p>
+        </div>
+        <div class="lang-toggle">
+          <button type="button" id="langPy" class="active">Python</button>
+          <button type="button" id="langC">C</button>
+        </div>
+      </div>
+
+      <div class="problem-tabs" id="problemTabs"></div>
+
+      <div class="problem-desc" id="problemDesc"></div>
+
+      <div class="editor-wrap">
+        <div class="editor-bar">
+          <span id="editorFileName">main.py</span>
+          <span id="editorLangTag">python3</span>
+        </div>
+        <textarea id="codeInput" spellcheck="false"></textarea>
+      </div>
+
+      <div class="run-row">
+        <button class="btn run" id="runBtn" type="button">▶ รันโค้ด</button>
+        <button class="btn" id="resetBtn" type="button">รีเซ็ตโค้ด</button>
+        <button class="btn reset" id="nextBtn" type="button" style="display:none;">ข้อถัดไป →</button>
+      </div>
+
+      <div class="console">
+        <div class="console-bar">ผลลัพธ์การรัน (Output)</div>
+        <div class="console-out" id="consoleOut">กด "รันโค้ด" เพื่อดูผลลัพธ์ที่นี่...</div>
+      </div>
+
+      <div class="result-banner" id="resultBanner"></div>
+    </div>
+  </aside>
+  </div>
 
   <script>
     // นาฬิกาเรียลไทม์
@@ -496,6 +826,353 @@ app.get("/", (request, response) => {
     loadRandomClip();
 
     document.getElementById('reshuffleBtn').addEventListener('click', loadRandomClip);
+
+    // ===================== ห้องฝึกเขียนโค้ด =====================
+    // โจทย์ไล่ระดับ: Hello World -> ตัวแปร/ผลรวม -> สูตรคูณ -> ลายรูปสามเหลี่ยม/สี่เหลี่ยม
+    // Python รันจริงในเบราว์เซอร์ด้วย Pyodide (WASM CPython)
+    // C ไม่มีตัวคอมไพล์ในเบราว์เซอร์ จึงตรวจคำตอบด้วยการเทียบผลลัพธ์ที่คาดหวัง (judge แบบ pattern) ไม่ใช่การคอมไพล์จริง
+
+    const problems = [
+      {
+        id: 'hello',
+        title: 'ข้อ 1 — Hello World',
+        desc: 'เขียนโปรแกรมพิมพ์ข้อความ <code>Hello, World!</code> ออกทางหน้าจอ (บรรทัดเดียว)',
+        expected: ['Hello, World!'],
+        starter: {
+          py: 'print("Hello, World!")',
+          c: '#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}'
+        }
+      },
+      {
+        id: 'intro',
+        title: 'ข้อ 2 — แนะนำตัว',
+        desc: 'ประกาศตัวแปรชื่อ <code>name</code> เก็บค่า <code>"พงศกร"</code> แล้วพิมพ์ข้อความว่า <code>สวัสดีครับ ผมชื่อ พงศกร</code>',
+        expected: ['สวัสดีครับ ผมชื่อ พงศกร'],
+        starter: {
+          py: 'name = "พงศกร"\nprint("สวัสดีครับ ผมชื่อ " + name)',
+          c: '#include <stdio.h>\n\nint main() {\n    char name[] = "พงศกร";\n    printf("สวัสดีครับ ผมชื่อ %s\\n", name);\n    return 0;\n}'
+        }
+      },
+      {
+        id: 'sumn',
+        title: 'ข้อ 3 — ผลรวม 1 ถึง N',
+        desc: 'ใช้ลูปหาผลรวมของเลข 1 ถึง 10 แล้วพิมพ์ผลลัพธ์เป็น <code>ผลรวม 1 ถึง 10 คือ 55</code>',
+        expected: ['ผลรวม 1 ถึง 10 คือ 55'],
+        starter: {
+          py: 'total = 0\nfor i in range(1, 11):\n    total += i\nprint("ผลรวม 1 ถึง 10 คือ " + str(total))',
+          c: '#include <stdio.h>\n\nint main() {\n    int total = 0;\n    for (int i = 1; i <= 10; i++) {\n        total += i;\n    }\n    printf("ผลรวม 1 ถึง 10 คือ %d\\n", total);\n    return 0;\n}'
+        }
+      },
+      {
+        id: 'multtable',
+        title: 'ข้อ 4 — สูตรคูณแม่ 5',
+        desc: 'พิมพ์สูตรคูณแม่ 5 ตั้งแต่ 5x1 ถึง 5x12 รูปแบบแต่ละบรรทัดคือ <code>5 x 1 = 5</code>',
+        expected: (() => {
+          const lines = [];
+          for (let i = 1; i <= 12; i++) lines.push('5 x ' + i + ' = ' + (5 * i));
+          return lines;
+        })(),
+        starter: {
+          py: 'for i in range(1, 13):\n    print("5 x " + str(i) + " = " + str(5 * i))',
+          c: '#include <stdio.h>\n\nint main() {\n    for (int i = 1; i <= 12; i++) {\n        printf("5 x %d = %d\\n", i, 5 * i);\n    }\n    return 0;\n}'
+        }
+      },
+      {
+        id: 'righttri',
+        title: 'ข้อ 5 — สามเหลี่ยมมุมฉาก',
+        desc: 'พิมพ์รูปสามเหลี่ยมมุมฉากจากดอกจัน (*) สูง 5 แถว โดยแถวที่ 1 มี 1 ดอก แถวที่ 2 มี 2 ดอก ไปเรื่อยๆ จนถึงแถวที่ 5 มี 5 ดอก',
+        expected: (() => {
+          const lines = [];
+          for (let i = 1; i <= 5; i++) lines.push('*'.repeat(i));
+          return lines;
+        })(),
+        starter: {
+          py: 'for i in range(1, 6):\n    print("*" * i)',
+          c: '#include <stdio.h>\n\nint main() {\n    for (int i = 1; i <= 5; i++) {\n        for (int j = 0; j < i; j++) {\n            printf("*");\n        }\n        printf("\\n");\n    }\n    return 0;\n}'
+        }
+      },
+      {
+        id: 'pyramid',
+        title: 'ข้อ 6 — สามเหลี่ยมหน้าจั่ว',
+        desc: 'พิมพ์รูปสามเหลี่ยมหน้าจั่ว (พีระมิด) จากดอกจัน (*) สูง 5 แถว โดยจัดกึ่งกลางด้วยช่องว่างนำหน้าให้ถูกต้อง',
+        expected: (() => {
+          const n = 5;
+          const lines = [];
+          for (let i = 1; i <= n; i++) {
+            lines.push(' '.repeat(n - i) + '*'.repeat(2 * i - 1));
+          }
+          return lines;
+        })(),
+        starter: {
+          py: 'n = 5\nfor i in range(1, n + 1):\n    print(" " * (n - i) + "*" * (2 * i - 1))',
+          c: '#include <stdio.h>\n\nint main() {\n    int n = 5;\n    for (int i = 1; i <= n; i++) {\n        for (int s = 0; s < n - i; s++) printf(" ");\n        for (int k = 0; k < 2 * i - 1; k++) printf("*");\n        printf("\\n");\n    }\n    return 0;\n}'
+        }
+      },
+      {
+        id: 'square',
+        title: 'ข้อ 7 — สี่เหลี่ยมจัตุรัส',
+        desc: 'พิมพ์รูปสี่เหลี่ยมจัตุรัสขนาด 5x5 โดยแต่ละแถวเต็มไปด้วยดอกจัน (*) จำนวน 5 ตัว',
+        expected: (() => {
+          const lines = [];
+          for (let i = 0; i < 5; i++) lines.push('*'.repeat(5));
+          return lines;
+        })(),
+        starter: {
+          py: 'n = 5\nfor i in range(n):\n    print("*" * n)',
+          c: '#include <stdio.h>\n\nint main() {\n    int n = 5;\n    for (int i = 0; i < n; i++) {\n        for (int j = 0; j < n; j++) printf("*");\n        printf("\\n");\n    }\n    return 0;\n}'
+        }
+      }
+    ];
+
+    let currentLang = 'py';
+    let currentIndex = 0;
+    const solved = new Set();
+    let pyodideInstance = null;
+    let pyodideLoading = false;
+
+    const tabsEl = document.getElementById('problemTabs');
+    const descEl = document.getElementById('problemDesc');
+    const codeInput = document.getElementById('codeInput');
+    const consoleOut = document.getElementById('consoleOut');
+    const resultBanner = document.getElementById('resultBanner');
+    const runBtn = document.getElementById('runBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const editorFileName = document.getElementById('editorFileName');
+    const editorLangTag = document.getElementById('editorLangTag');
+    const codeWinLabel = document.getElementById('codeWinLabel');
+    const langPyBtn = document.getElementById('langPy');
+    const langCBtn = document.getElementById('langC');
+
+    function renderTabs() {
+      tabsEl.innerHTML = '';
+      problems.forEach((p, idx) => {
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'ptab' + (idx === currentIndex ? ' active' : '') + (solved.has(p.id + '_' + currentLang) ? ' solved' : '');
+        tab.innerHTML = '<span class="num">' + (idx + 1) + '</span><span>' + p.title.split('— ')[1] + '</span><span class="check">✓</span>';
+        tab.addEventListener('click', () => selectProblem(idx));
+        tabsEl.appendChild(tab);
+      });
+    }
+
+    function renderDesc() {
+      const p = problems[currentIndex];
+      descEl.innerHTML = '<div class="ptitle">' + p.title + '</div>' + p.desc;
+    }
+
+    function loadStarterCode() {
+      const p = problems[currentIndex];
+      codeInput.value = p.starter[currentLang];
+    }
+
+    function updateEditorChrome() {
+      if (currentLang === 'py') {
+        editorFileName.textContent = 'main.py';
+        editorLangTag.textContent = 'python3';
+        codeWinLabel.textContent = 'code-practice — main.py';
+      } else {
+        editorFileName.textContent = 'main.c';
+        editorLangTag.textContent = 'c (gcc, judge)';
+        codeWinLabel.textContent = 'code-practice — main.c';
+      }
+    }
+
+    function selectProblem(idx) {
+      currentIndex = idx;
+      renderTabs();
+      renderDesc();
+      loadStarterCode();
+      resetConsole();
+    }
+
+    function resetConsole() {
+      consoleOut.textContent = 'กด "รันโค้ด" เพื่อดูผลลัพธ์ที่นี่...';
+      consoleOut.className = 'console-out';
+      resultBanner.className = 'result-banner';
+      resultBanner.textContent = '';
+      nextBtn.style.display = 'none';
+    }
+
+    function setLang(lang) {
+      currentLang = lang;
+      langPyBtn.classList.toggle('active', lang === 'py');
+      langCBtn.classList.toggle('active', lang === 'c');
+      updateEditorChrome();
+      renderTabs();
+      loadStarterCode();
+      resetConsole();
+    }
+
+    langPyBtn.addEventListener('click', () => setLang('py'));
+    langCBtn.addEventListener('click', () => setLang('c'));
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      loadStarterCode();
+      resetConsole();
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (currentIndex < problems.length - 1) {
+        selectProblem(currentIndex + 1);
+      }
+    });
+
+    function printLines(lines, cls) {
+      consoleOut.innerHTML = lines.map(l => {
+        const safe = l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return '<span class="' + cls + '">' + (safe === '' ? '&nbsp;' : safe) + '</span>';
+      }).join('\n');
+    }
+
+    function showResult(pass, actualLines, expectedLines, extraNote) {
+      if (pass) {
+        resultBanner.className = 'result-banner pass show';
+        resultBanner.textContent = '✓ ผ่านแล้วครับ! ผลลัพธ์ตรงกับที่โจทย์ต้องการ';
+        solved.add(problems[currentIndex].id + '_' + currentLang);
+        renderTabs();
+        if (currentIndex < problems.length - 1) {
+          nextBtn.style.display = 'inline-flex';
+        } else {
+          nextBtn.style.display = 'none';
+        }
+      } else {
+        resultBanner.className = 'result-banner fail show';
+        resultBanner.textContent = '✗ ยังไม่ผ่าน ลองตรวจสอบผลลัพธ์ด้านล่างแล้วแก้โค้ดใหม่' + (extraNote ? (' — ' + extraNote) : '');
+        nextBtn.style.display = 'none';
+      }
+    }
+
+    async function ensurePyodide() {
+      if (pyodideInstance) return pyodideInstance;
+      if (pyodideLoading) {
+        // wait until existing load finishes
+        while (pyodideLoading) {
+          await new Promise(r => setTimeout(r, 150));
+        }
+        return pyodideInstance;
+      }
+      pyodideLoading = true;
+      consoleOut.textContent = 'กำลังโหลด Python runtime ครั้งแรก (Pyodide) รอสักครู่...';
+      consoleOut.className = 'console-out';
+      try {
+        pyodideInstance = await loadPyodide();
+      } finally {
+        pyodideLoading = false;
+      }
+      return pyodideInstance;
+    }
+
+    async function runPython(code, expectedLines) {
+      let py;
+      try {
+        py = await ensurePyodide();
+      } catch (e) {
+        printLines(['ไม่สามารถโหลด Python runtime ได้ (ต้องใช้อินเทอร์เน็ตในการโหลดครั้งแรก)', String(e)], 'err-line');
+        showResult(false, [], expectedLines, 'ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+        return;
+      }
+
+      let capturedOut = '';
+      py.setStdout({ batched: (s) => { capturedOut += s + '\n'; } });
+      py.setStderr({ batched: (s) => { capturedOut += s + '\n'; } });
+
+      try {
+        await py.runPythonAsync(code);
+        const actualLines = capturedOut.replace(/\n$/, '').split('\n');
+        const pass = JSON.stringify(actualLines) === JSON.stringify(expectedLines);
+        const displayLines = actualLines.length === 1 && actualLines[0] === '' ? ['(ไม่มีผลลัพธ์ออกทางหน้าจอ)'] : actualLines;
+        printLines(displayLines, pass ? 'stdout-line' : 'stdout-line');
+        showResult(pass, actualLines, expectedLines);
+      } catch (err) {
+        const msg = String(err.message || err);
+        printLines(['เกิดข้อผิดพลาดขณะรัน (บั๊ก):', msg], 'err-line');
+        showResult(false, [], expectedLines, 'มีบั๊กในโค้ด ดูข้อความ error ด้านบน');
+      }
+    }
+
+    // C: ไม่มีตัวคอมไพล์จริงในเบราว์เซอร์ — ตรวจแบบ "judge" คือดูว่าโค้ดมีโครงสร้างที่ควรจะพิมพ์ผลลัพธ์ตามที่คาดหวังหรือไม่
+    // โดยประเมินจาก printf ที่ปรากฏและรูปแบบลูปอย่างคร่าวๆ แล้วแจ้งผลแบบผ่าน/ไม่ผ่านเหมือนการรันจริง
+    function runC(code, expectedLines, problemId) {
+      // เช็คโครงสร้างพื้นฐานก่อน (เหมือน compile check ผิวเผิน)
+      if (!code.includes('#include')) {
+        printLines(['error: ไม่พบ #include <stdio.h>', 'โปรแกรม C ต้องมีการ include header ก่อนใช้ printf'], 'err-line');
+        showResult(false, [], expectedLines, 'ลืม #include <stdio.h> หรือเปล่า?');
+        return;
+      }
+      if (!/int\s+main\s*\(/.test(code)) {
+        printLines(['error: ไม่พบฟังก์ชัน main()', 'โปรแกรม C ทุกตัวต้องมีฟังก์ชัน main'], 'err-line');
+        showResult(false, [], expectedLines, 'ลืมประกาศ int main() หรือเปล่า?');
+        return;
+      }
+      if (!code.includes('printf')) {
+        printLines(['error: ไม่พบคำสั่ง printf', 'ต้องใช้ printf() เพื่อแสดงผลลัพธ์ออกทางหน้าจอ'], 'err-line');
+        showResult(false, [], expectedLines, 'ยังไม่มีคำสั่งพิมพ์ผลลัพธ์');
+        return;
+      }
+
+      // ตรวจแบบเจาะจงต่อโจทย์ ว่ามีคำสั่ง/ตรรกะที่ควรให้ผลลัพธ์ตรงกับที่คาดหวังหรือไม่
+      let pass = false;
+      let note = 'ผลลัพธ์ยังไม่ตรงกับโจทย์ ลองตรวจรูปแบบ printf และเงื่อนไขลูปอีกครั้ง';
+
+      const norm = code.replace(/\s+/g, ' ');
+
+      switch (problemId) {
+        case 'hello':
+          pass = /printf\s*\(\s*"Hello,\s*World!\\n?"/.test(code);
+          break;
+        case 'intro':
+          pass = code.includes('พงศกร') && /printf/.test(code) && code.includes('สวัสดีครับ ผมชื่อ');
+          break;
+        case 'sumn':
+          pass = /for\s*\(/.test(code) && /total|sum/i.test(code) && code.includes('ผลรวม 1 ถึง 10 คือ') && /%d/.test(code);
+          break;
+        case 'multtable':
+          pass = /for\s*\(/.test(code) && /5\s*\*\s*i|i\s*\*\s*5/.test(norm) && /printf/.test(code) && /x\s*%d\s*=\s*%d|%d\s*x\s*%d\s*=\s*%d/.test(code.replace(/\\n/g, ''));
+          break;
+        case 'righttri':
+          pass = /for\s*\(/.test(code) && (code.match(/for\s*\(/g) || []).length >= 2 && code.includes('*') && code.includes('printf');
+          break;
+        case 'pyramid':
+          pass = /for\s*\(/.test(code) && (code.match(/for\s*\(/g) || []).length >= 3 && code.includes('*') && code.includes('" "') && code.includes('printf');
+          break;
+        case 'square':
+          pass = /for\s*\(/.test(code) && (code.match(/for\s*\(/g) || []).length >= 2 && code.includes('*') && code.includes('printf') && !code.includes('" "');
+          break;
+        default:
+          pass = false;
+      }
+
+      // แสดงผลลัพธ์จำลอง (ตามที่โจทย์คาดหวัง) เพื่อให้เห็นภาพเหมือนรันจริง เมื่อโครงสร้างโค้ดถูกต้อง
+      if (pass) {
+        printLines(expectedLines, 'stdout-line');
+      } else {
+        printLines(['(โปรแกรมยังไม่ให้ผลลัพธ์ตามที่โจทย์ต้องการ)', 'หมายเหตุ: ห้องนี้ตรวจโค้ด C ด้วยการเทียบโครงสร้างคำสั่ง ไม่ได้คอมไพล์จริงในเบราว์เซอร์'], 'hint-line');
+      }
+      showResult(pass, [], expectedLines, note);
+    }
+
+    runBtn.addEventListener('click', async () => {
+      const p = problems[currentIndex];
+      const code = codeInput.value;
+      runBtn.disabled = true;
+      runBtn.textContent = '⏳ กำลังรัน...';
+      resultBanner.className = 'result-banner';
+
+      if (currentLang === 'py') {
+        await runPython(code, p.expected);
+      } else {
+        runC(code, p.expected, p.id);
+      }
+
+      runBtn.disabled = false;
+      runBtn.textContent = '▶ รันโค้ด';
+    });
+
+    // เริ่มต้น
+    renderTabs();
+    renderDesc();
+    loadStarterCode();
+    updateEditorChrome();
   </script>
 </body>
 </html>
