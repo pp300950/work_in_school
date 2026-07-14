@@ -1,15 +1,15 @@
 {
-    "name": "web-server-homework",
-    "version": "1.0.0",
-    "description": "Web Server พื้นฐานสำหรับส่งงาน",
-    "main": "server.js",
-    "scripts": {
-      "start": "node server.js"
-    },
-    "dependencies": {
-      "express": "^4.19.0"
-    },
-    "engines": {
-      "node": ">=18.0.0"
-    }
+  "name": "web-server-homework",
+  "version": "1.0.0",
+  "description": "Web Server พื้นฐานสำหรับส่งงาน",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
+}
