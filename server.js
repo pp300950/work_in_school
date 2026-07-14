@@ -296,9 +296,35 @@ app.get("/", (request, response) => {
     outline-offset: 2px;
   }
 
-  #clockOut, #visitOut {
+  #clockOut {
     color: var(--teal);
     font-weight: 600;
+  }
+
+  .video-card {
+    margin-top: 18px;
+  }
+
+  .video-frame {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #000;
+    border: 1px solid var(--panel-border);
+  }
+
+  .video-frame iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  .video-card .actions {
+    margin-top: 14px;
   }
 
   .footer-line {
@@ -309,13 +335,9 @@ app.get("/", (request, response) => {
     font-size: 12px;
     color: var(--muted);
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     flex-wrap: wrap;
     gap: 8px;
-  }
-
-  .footer-line .heart {
-    color: var(--amber);
   }
 
   @media (max-width: 480px) {
@@ -372,18 +394,30 @@ app.get("/", (request, response) => {
         <span class="badge">เวลาปัจจุบัน: <span id="clockOut">--:--:--</span></span>
       </div>
 
-      <div class="actions">
-        <button class="btn primary" id="visitBtn" type="button">นับจำนวนคลิก <span id="visitOut">0</span></button>
-        <button class="btn" id="themeBtn" type="button">สลับธีมสี</button>
-        <button class="btn" id="matrixBtn" type="button">โหมด Matrix</button>
+      <div class="card video-card">
+        <div class="card-eyebrow">คลิปปั่นๆ ประจำวัน</div>
+        <div class="video-frame">
+          <iframe
+            id="vibeVideo"
+            src=""
+            title="คลิปปั่นๆ"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            loading="lazy">
+          </iframe>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="reshuffleBtn" type="button">สุ่มคลิปใหม่</button>
+        </div>
       </div>
 
       <div class="footer-line">
         <span>ส่งงาน CS Web Programming</span>
-        <span>สร้างด้วย <span class="heart">♥</span> และ Express.js</span>
       </div>
     </div>
   </main>
+
 
   <script>
     // นาฬิกาเรียลไทม์
@@ -397,72 +431,71 @@ app.get("/", (request, response) => {
     tick();
     setInterval(tick, 1000);
 
-    // ปุ่มนับคลิก
-    let clicks = 0;
-    document.getElementById('visitBtn').addEventListener('click', () => {
-      clicks++;
-      document.getElementById('visitOut').textContent = clicks;
-    });
-
-    // สลับธีมสี (teal <-> amber accent)
-    const themeBtn = document.getElementById('themeBtn');
-    let altTheme = false;
-    themeBtn.addEventListener('click', () => {
-      altTheme = !altTheme;
-      const root = document.documentElement.style;
-      if (altTheme) {
-        root.setProperty('--teal', '#f5a962');
-        root.setProperty('--green', '#f5a962');
-      } else {
-        root.setProperty('--teal', '#5eead4');
-        root.setProperty('--green', '#5eead4');
-      }
-    });
-
-    // โหมด Matrix — ฝนตัวอักษรบน canvas พื้นหลัง
-    let matrixOn = false;
+    // โหมด Matrix — ฝนตัวอักษรบน canvas พื้นหลัง (เปิดอัตโนมัติทันทีที่โหลดหน้า)
     let matrixCanvas, matrixCtx, matrixInterval;
 
-    document.getElementById('matrixBtn').addEventListener('click', () => {
-      matrixOn = !matrixOn;
-      if (matrixOn) {
-        matrixCanvas = document.createElement('canvas');
-        matrixCanvas.style.position = 'fixed';
-        matrixCanvas.style.top = '0';
-        matrixCanvas.style.left = '0';
-        matrixCanvas.style.width = '100vw';
-        matrixCanvas.style.height = '100vh';
-        matrixCanvas.style.zIndex = '0';
-        matrixCanvas.style.opacity = '0.5';
+    function startMatrix() {
+      matrixCanvas = document.createElement('canvas');
+      matrixCanvas.style.position = 'fixed';
+      matrixCanvas.style.top = '0';
+      matrixCanvas.style.left = '0';
+      matrixCanvas.style.width = '100vw';
+      matrixCanvas.style.height = '100vh';
+      matrixCanvas.style.zIndex = '0';
+      matrixCanvas.style.opacity = '0.5';
+      matrixCanvas.width = window.innerWidth;
+      matrixCanvas.height = window.innerHeight;
+      document.body.appendChild(matrixCanvas);
+      matrixCtx = matrixCanvas.getContext('2d');
+
+      const chars = 'アイウエオカキクケコ01アルゴリズムEXPRESS';
+      const fontSize = 15;
+      const columns = Math.floor(matrixCanvas.width / fontSize);
+      const drops = new Array(columns).fill(1);
+
+      matrixInterval = setInterval(() => {
+        matrixCtx.fillStyle = 'rgba(10, 14, 20, 0.08)';
+        matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+        matrixCtx.fillStyle = '#5eead4';
+        matrixCtx.font = fontSize + 'px monospace';
+        for (let i = 0; i < drops.length; i++) {
+          const text = chars[Math.floor(Math.random() * chars.length)];
+          matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+          if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+            drops[i] = 0;
+          }
+          drops[i]++;
+        }
+      }, 45);
+    }
+    startMatrix();
+
+    window.addEventListener('resize', () => {
+      if (matrixCanvas) {
         matrixCanvas.width = window.innerWidth;
         matrixCanvas.height = window.innerHeight;
-        document.body.appendChild(matrixCanvas);
-        matrixCtx = matrixCanvas.getContext('2d');
-
-        const chars = 'アイウエオカキクケコ01アルゴリズムEXPRESS';
-        const fontSize = 15;
-        const columns = Math.floor(matrixCanvas.width / fontSize);
-        const drops = new Array(columns).fill(1);
-
-        matrixInterval = setInterval(() => {
-          matrixCtx.fillStyle = 'rgba(10, 14, 20, 0.08)';
-          matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
-          matrixCtx.fillStyle = '#5eead4';
-          matrixCtx.font = fontSize + 'px monospace';
-          for (let i = 0; i < drops.length; i++) {
-            const text = chars[Math.floor(Math.random() * chars.length)];
-            matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
-            if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
-              drops[i] = 0;
-            }
-            drops[i]++;
-          }
-        }, 45);
-      } else {
-        clearInterval(matrixInterval);
-        if (matrixCanvas) matrixCanvas.remove();
       }
     });
+
+    // คลิปปั่นๆ — สุ่มวิดีโอ YouTube จากลิสต์ แล้วฝัง embed (ไม่ต้องใช้ API key)
+    const vibeClips = [
+      'dQw4w9WgXcQ', // Rick Astley - Never Gonna Give You Up
+      'y6120QOlsfU', // Darude - Sandstorm
+      'FtutLA63Cp8', // Baby Shark Dance
+      'PGNiXGX2nLU', // Trololo — Eduard Khil
+      'oHg5SJYRHA0', // RickRoll'D remix (Numa Numa era clip)
+      'Sagg08DrO5U', // Harlem Shake
+      'jofNR_WkoCE'  // Chocolate Rain
+    ];
+
+    function loadRandomClip() {
+      const iframe = document.getElementById('vibeVideo');
+      const pick = vibeClips[Math.floor(Math.random() * vibeClips.length)];
+      iframe.src = 'https://www.youtube.com/embed/' + pick + '?autoplay=1&mute=1';
+    }
+    loadRandomClip();
+
+    document.getElementById('reshuffleBtn').addEventListener('click', loadRandomClip);
   </script>
 </body>
 </html>
