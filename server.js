@@ -145,10 +145,16 @@ app.get('/', async (req, res) => {
         <div class="edit-form hidden" id="editFormArea">
           <h4>แก้ไขข้อมูล: <span id="editingLabel"></span></h4>
           <form id="editForm">
-            <input type="hidden" name="student_id" id="edit_student_id">
+            <input type="hidden" name="original_student_id" id="edit_original_student_id">
+            <div>
+              <label class="muted" for="edit_student_id">รหัสนักศึกษา</label>
+              <input id="edit_student_id" name="student_id" type="text" placeholder="รหัสนักศึกษา" required
+                style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;margin-top:4px">
+            </div>
             <div style="margin-top:8px">
+              <label class="muted" for="edit_student_name">ชื่อ-นามสกุล</label>
               <input id="edit_student_name" name="student_name" type="text" placeholder="ชื่อ-นามสกุล" required
-                style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
+                style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;margin-top:4px">
             </div>
             <div style="margin-top:10px;display:flex;gap:8px">
               <button type="submit" class="btn" id="saveEditBtn">บันทึก</button>
@@ -240,6 +246,7 @@ app.get('/', async (req, res) => {
       if (!s) { editingId = null; area.classList.add('hidden'); return; }
       area.classList.remove('hidden');
       document.getElementById('editingLabel').textContent = s.student_id;
+      document.getElementById('edit_original_student_id').value = s.student_id;
       document.getElementById('edit_student_id').value = s.student_id;
       document.getElementById('edit_student_name').value = s.student_name;
     }
@@ -267,11 +274,11 @@ app.get('/', async (req, res) => {
       if (!data.ok) throw new Error(data.error || 'เพิ่มไม่สำเร็จ');
     }
 
-    async function updateStudent(student_id, student_name) {
+    async function updateStudent(original_student_id, student_id, student_name) {
       const res = await fetch('/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student_id: student_id, student_name: student_name })
+        body: JSON.stringify({ original_student_id: original_student_id, student_id: student_id, student_name: student_name })
       });
       const data = await res.json().catch(function () { return { ok: false, error: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง' }; });
       if (!data.ok) throw new Error(data.error || 'บันทึกไม่สำเร็จ');
@@ -342,13 +349,14 @@ app.get('/', async (req, res) => {
 
     document.getElementById('editForm').addEventListener('submit', async function (ev) {
       ev.preventDefault();
-      const id = document.getElementById('edit_student_id').value;
+      const originalId = document.getElementById('edit_original_student_id').value;
+      const newId = document.getElementById('edit_student_id').value.trim();
       const name = document.getElementById('edit_student_name').value.trim();
-      if (!id || !name) { alert('กรอกข้อมูลให้ครบ'); return; }
+      if (!newId || !name) { alert('กรอกข้อมูลให้ครบ'); return; }
       const btn = document.getElementById('saveEditBtn');
       btn.disabled = true;
       try {
-        await updateStudent(id, name);
+        await updateStudent(originalId, newId, name);
         editingId = null;
         await refresh();
       } catch (err) {
@@ -418,19 +426,51 @@ app.post('/delete', async (req, res) => {
   }
 });
 
-// อัพเดตข้อมูลนักศึกษา (แก้ชื่อ)
+// อัพเดตข้อมูลนักศึกษา (แก้ชื่อ และ/หรือ แก้รหัสนักศึกษา)
 app.post('/update', async (req, res) => {
+  const original_student_id = String((req.body && req.body.original_student_id) || '').trim();
   const student_id = String((req.body && req.body.student_id) || '').trim();
   const student_name = String((req.body && req.body.student_name) || '').trim();
-  if (!student_id || !student_name) return res.status(400).json({ ok: false, error: 'กรอกข้อมูลไม่ครบ' });
 
+  if (!original_student_id || !student_id || !student_name) {
+    return res.status(400).json({ ok: false, error: 'กรอกข้อมูลไม่ครบ' });
+  }
+
+  const client = await pool.connect();
   try {
-    const result = await pool.query('UPDATE students SET student_name = $1 WHERE student_id = $2', [student_name, student_id]);
-    if (result.rowCount === 0) return res.status(404).json({ ok: false, error: 'ไม่พบรหัสนักศึกษานี้' });
+    await client.query('BEGIN');
+
+    // ถ้าเปลี่ยนรหัสเป็นรหัสใหม่ ให้เช็คว่ารหัสใหม่ไม่ชนกับของคนอื่นก่อน
+    if (student_id !== original_student_id) {
+      const { rows: existing } = await client.query(
+        'SELECT 1 FROM students WHERE student_id = $1',
+        [student_id]
+      );
+      if (existing.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ ok: false, error: 'รหัสนักศึกษานี้มีอยู่แล้ว' });
+      }
+    }
+
+    const result = await client.query(
+      'UPDATE students SET student_id = $1, student_name = $2 WHERE student_id = $3',
+      [student_id, student_name, original_student_id]
+    );
+
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, error: 'ไม่พบรหัสนักศึกษานี้' });
+    }
+
+    await client.query('COMMIT');
     res.json({ ok: true });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('POST /update error:', err && err.stack ? err.stack : err);
-    res.status(500).json({ ok: false, error: String(err) });
+    const message = err && err.code === '23505' ? 'รหัสนักศึกษานี้มีอยู่แล้ว' : String(err);
+    res.status(500).json({ ok: false, error: message });
+  } finally {
+    client.release();
   }
 });
 
