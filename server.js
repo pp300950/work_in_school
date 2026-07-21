@@ -44,7 +44,7 @@ function escapeHtml(str) {
 function escapeAttr(str) { return escapeHtml(str); }
 function escapeJs(str) { return String(str || '').replace(/'/g, "\\'"); }
 
-// API: คืนค่า JSON ของนักศึกษาทั้งหมด (สำหรับ sidebar หรือ AJAX refresh)
+// API: คืนค่า JSONของนักศึกษาทั้งหมด (สำหรับ sidebar หรือ AJAX refresh)
 app.get('/api/students', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM students ORDER BY student_id');
@@ -172,11 +172,11 @@ app.get('/', async (req, res) => {
       tbody.innerHTML = '';
       for (const s of students) {
         const li = document.createElement('div'); li.className = 'list-item';
-        li.innerHTML = `<div><div><strong>${escapeHtml(s.student_name)}</strong></div><div class="meta">${escapeHtml(s.student_id)}</div></div><div><button class="icon-btn" data-action="pick" data-id="${escapeAttr(s.student_id)}">✏️</button><button class="icon-btn" data-action="del" data-id="${escapeAttr(s.student_id)}">🗑️</button></div>`;
+        li.innerHTML = '<div><div><strong>' + escapeHtml(s.student_name) + '</strong></div><div class="meta">' + escapeHtml(s.student_id) + '</div></div><div><button class="icon-btn" data-action="pick" data-id="' + escapeAttr(s.student_id) + '">✏️</button><button class="icon-btn" data-action="del" data-id="' + escapeAttr(s.student_id) + '">🗑️</button></div>';
         list.appendChild(li);
 
         const tr = document.createElement('tr'); tr.setAttribute('data-id', s.student_id);
-        tr.innerHTML = `<td>${escapeHtml(s.student_id)}</td><td>${escapeHtml(s.student_name)}</td><td class="row-actions"><button class="btn" data-action="edit" data-id="${escapeAttr(s.student_id)}">แก้ไข</button><form style="display:inline" action="/delete" method="post" onsubmit="return confirm('ต้องการลบนักศึกษา ${escapeJs(s.student_name)} ใช่หรือไม่?');"><input type="hidden" name="student_id" value="${escapeAttr(s.student_id)}"><button class="btn" type="submit" style="background:#ff6b6b;color:#fff;margin-left:6px">ลบ</button></form></td>`;
+        tr.innerHTML = '<td>' + escapeHtml(s.student_id) + '</td><td>' + escapeHtml(s.student_name) + '</td><td class="row-actions"><button class="btn" data-action="edit" data-id="' + escapeAttr(s.student_id) + '">แก้ไข</button><form style="display:inline" action="/delete" method="post" onsubmit="return confirm(\'ต้องการลบนักศึกษา ' + escapeJs(s.student_name) + ' ใช่หรือไม่?\');"><input type="hidden" name="student_id" value="' + escapeAttr(s.student_id) + '"><button class="btn" type="submit" style="background:#ff6b6b;color:#fff;margin-left:6px">ลบ</button></form></td>';
         tbody.appendChild(tr);
       }
     }
