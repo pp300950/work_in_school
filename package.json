@@ -4,7 +4,10 @@
   "description": "Web Server พื้นฐานสำหรับส่งงาน",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dependencies": {
+        "pg": "^8.11.3"
+    },
   },
   "dependencies": {
     "express": "^4.19.0"
