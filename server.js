@@ -1,4 +1,4 @@
-// ใช้ Express + pg เพื่อสร้างเว็บหน้าแอด/แก้/ลบข้อมูลนักศึกษา พร้อม UI สวยงามและ sidebar รายชื่อ
+// รวม 2 โปรเจกต์: หน้า terminal/intro (ซ้าย) + ระบบ CRUD ฐานข้อมูลนักศึกษาด้วย Express + pg (ขวา)
 const express = require('express');
 const { Pool } = require('pg');
 
@@ -54,75 +54,580 @@ app.get('/api/students', async (req, res) => {
   }
 });
 
-// หน้าแรก: โครงหน้าเปล่า ๆ — ตารางและ sidebar ทั้งหมด render ด้วย JS ฝั่ง client
-// (แก้บั๊กเดิม: เดิม server render ข้อมูลมาชุดหนึ่ง แล้ว JS มา render ทับอีกชุดตอนโหลดหน้า
-//  ทำให้เกิด race condition — ถ้า fetch พลาด/ช้า ปุ่มที่เห็นจะหลุดจาก state จริง และปุ่มแก้ไขค้าง)
+// หน้าแรก: ฝั่งซ้าย = terminal/intro (เดิม), ฝั่งขวา = กล่อง CRUD ฐานข้อมูลนักศึกษา
+// ตารางและ sidebar ฝั่งขวา render ด้วย JS ฝั่ง client ทั้งหมด (ไม่ผสม server-render ซ้ำ กัน race condition)
 app.get('/', async (req, res) => {
   res.set('Content-Type', 'text/html; charset=utf-8');
   const msg = req.query.msg ? String(req.query.msg) : '';
 
-  const html = `<!doctype html>
+  res.send(`
+<!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ฐานข้อมูลงาน — students</title>
-  <style>
-    :root{--bg:#071024;--card:#071827;--muted:#9aa6b2;--accent:#5eead4;--danger:#ff6b6b}
-    *{box-sizing:border-box}
-    body{margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Thai', sans-serif;background:linear-gradient(180deg,#031026 0%, #071024 100%);color:#e6eef6;padding:20px}
-    .wrap{max-width:1100px;margin:0 auto;display:flex;gap:18px}
-    .main{flex:1}
-    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);padding:18px;border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.6)}
-    h1{margin:0 0 8px;font-size:20px}
-    p.lead{color:var(--muted);margin:0 0 12px}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>server.js — รหัสนักศึกษา 69319011766</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e14;
+    --bg-grid: #0f141c;
+    --panel: #10161f;
+    --panel-border: #1e2733;
+    --teal: #5eead4;
+    --amber: #f5a962;
+    --text: #e8ecef;
+    --muted: #7c8798;
+    --red: #ff6b6b;
+    --yellow: #f5c964;
+    --green: #5eead4;
+    --danger: #ff6b6b;
+  }
 
-    /* form */
-    .form-row{display:flex;gap:8px;margin-top:12px}
-    input[type=text]{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
-    button.btn{padding:10px 12px;border-radius:8px;border:0;background:var(--accent);color:#051018;font-weight:700;cursor:pointer}
-    button.btn:disabled{opacity:0.5;cursor:not-allowed}
+  * { box-sizing: border-box; }
 
-    /* table */
-    table{width:100%;border-collapse:collapse;margin-top:12px}
-    thead th{color:var(--muted);font-size:13px;padding:10px;text-align:left}
-    tbody td{padding:12px;border-top:1px solid rgba(255,255,255,0.03)}
-    .row-actions{display:flex;gap:6px;align-items:center}
-    .row-actions button.danger{background:#ff6b6b;color:#fff}
-    tr.editing{background:rgba(94,234,212,0.06)}
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans Thai', 'JetBrains Mono', monospace;
+  }
 
-    /* sidebar */
-    .sidebar{width:320px;flex-shrink:0}
-    .sidebar .card{max-height:calc(100vh - 60px);overflow:auto;padding:12px;position:sticky;top:20px}
-    .list-item{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:8px;margin-bottom:8px;background:rgba(255,255,255,0.01)}
-    .list-item.editing{outline:1px solid var(--accent)}
-    .list-item .meta{font-size:13px;color:var(--muted)}
-    .icon-btn{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px}
-    .icon-btn:hover{color:var(--accent);background:rgba(255,255,255,0.04)}
+  body {
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(94, 234, 212, 0.07) 1px, transparent 0);
+    background-size: 28px 28px;
+    padding: 40px 20px;
+  }
 
-    .edit-form{margin-top:12px;padding:10px;background:rgba(255,255,255,0.01);border-radius:8px}
-    .edit-form.hidden{display:none}
-    .muted{color:var(--muted);font-size:13px}
-    .msg{margin:10px 0;padding:10px;border-radius:8px;background:rgba(94,234,212,0.06);color:var(--accent)}
-    .err{margin:10px 0;padding:10px;border-radius:8px;background:rgba(255,107,107,0.08);color:var(--danger)}
-    .empty{color:var(--muted);padding:16px 4px}
+  .glow {
+    position: fixed;
+    top: -10%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 700px;
+    height: 700px;
+    background: radial-gradient(circle, rgba(94, 234, 212, 0.10) 0%, transparent 65%);
+    pointer-events: none;
+    z-index: 0;
+  }
 
-    @media (max-width:900px){.wrap{flex-direction:column}.sidebar{width:100%;height:auto}.sidebar .card{position:static;max-height:none}}
-  </style>
+  /* ----- layout: ซ้าย terminal / ขวา CRUD ----- */
+  .page-wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .col-left {
+    flex: 1 1 480px;
+    min-width: 320px;
+    max-width: 720px;
+  }
+
+  .col-right {
+    flex: 1 1 520px;
+    min-width: 320px;
+  }
+
+  /* ----- terminal (ฝั่งซ้าย, ของเดิม) ----- */
+  .terminal {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    box-shadow:
+      0 0 0 1px rgba(94, 234, 212, 0.04),
+      0 30px 60px -20px rgba(0, 0, 0, 0.6),
+      0 0 80px -30px rgba(94, 234, 212, 0.15);
+    overflow: hidden;
+    opacity: 0;
+    animation: rise 0.6s ease-out forwards;
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background: #0d131b;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .dots { display: flex; gap: 8px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .dot.r { background: #ff5f57; }
+  .dot.y { background: #febc2e; }
+  .dot.g { background: #28c840; }
+
+  .titlebar-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  .term-body {
+    padding: 28px 28px 32px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  .line { display: flex; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+  .prompt { color: var(--teal); user-select: none; flex-shrink: 0; }
+  .cmd { color: var(--text); }
+  .out-muted { color: var(--muted); }
+  .out-ok { color: var(--green); }
+
+  .divider {
+    border: none;
+    border-top: 1px dashed var(--panel-border);
+    margin: 18px 0;
+  }
+
+  .hero {
+    font-family: 'Noto Sans Thai', sans-serif;
+    margin: 22px 0 6px;
+  }
+
+  .hero h1 {
+    margin: 0 0 8px;
+    font-size: clamp(20px, 4vw, 28px);
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .hero h1 .cursor-blink {
+    display: inline-block;
+    width: 3px;
+    height: 1em;
+    background: var(--teal);
+    margin-left: 6px;
+    vertical-align: -0.15em;
+    animation: blink 1s steps(1) infinite;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  .hero p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14.5px;
+  }
+
+  .card {
+    margin-top: 22px;
+    background: #0d131b;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    font-family: 'Noto Sans Thai', sans-serif;
+  }
+
+  .card-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--amber);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-eyebrow::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+  }
+
+  .field {
+    display: grid;
+    grid-template-columns: 128px 1fr;
+    gap: 4px 12px;
+    padding: 7px 0;
+    font-size: 14.5px;
+  }
+
+  .field + .field {
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .field .k {
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    padding-top: 2px;
+  }
+
+  .field .v {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .badges {
+    margin-top: 20px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--panel-border);
+    color: var(--muted);
+    background: rgba(255,255,255,0.02);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .badge .pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  .actions {
+    margin-top: 24px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  button.btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 16px;
+    border-radius: 7px;
+    border: 1px solid var(--panel-border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  button.btn:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+    background: rgba(94, 234, 212, 0.06);
+    transform: translateY(-1px);
+  }
+
+  button.btn:active { transform: translateY(0); }
+  button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  button.btn.primary {
+    background: var(--teal);
+    color: #0a0e14;
+    border-color: var(--teal);
+    font-weight: 700;
+  }
+
+  button.btn.primary:hover {
+    background: #7ff3dc;
+    color: #0a0e14;
+    box-shadow: 0 0 20px rgba(94, 234, 212, 0.35);
+  }
+
+  button.btn.danger {
+    background: var(--red);
+    color: #fff;
+    border-color: var(--red);
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+  }
+
+  #clockOut {
+    color: var(--teal);
+    font-weight: 600;
+  }
+
+  .video-card { margin-top: 18px; }
+
+  .video-frame {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #000;
+    border: 1px solid var(--panel-border);
+  }
+
+  .video-frame iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  .video-card .actions { margin-top: 14px; }
+
+  .footer-line {
+    margin-top: 26px;
+    padding-top: 16px;
+    border-top: 1px solid var(--panel-border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* ----- CRUD box (ฝั่งขวา) ----- */
+  .crud-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border: 1px solid var(--panel-border);
+    padding: 18px 20px;
+    border-radius: 10px;
+    box-shadow:
+      0 0 0 1px rgba(94, 234, 212, 0.04),
+      0 30px 60px -20px rgba(0, 0, 0, 0.6);
+    font-family: 'Noto Sans Thai', sans-serif;
+  }
+
+  .crud-card h2 {
+    margin: 0 0 6px;
+    font-size: 19px;
+    color: var(--text);
+  }
+
+  .crud-card p.lead {
+    color: var(--muted);
+    margin: 0 0 12px;
+    font-size: 13.5px;
+  }
+
+  .form-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+  input[type=text] {
+    flex: 1;
+    min-width: 140px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--panel-border);
+    background: rgba(255,255,255,0.02);
+    color: inherit;
+    font-family: 'Noto Sans Thai', sans-serif;
+  }
+  input[type=text]:focus {
+    outline: none;
+    border-color: var(--teal);
+  }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+  thead th {
+    color: var(--muted);
+    font-size: 12.5px;
+    padding: 10px;
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  tbody td { padding: 12px 10px; border-top: 1px solid rgba(255,255,255,0.04); font-size: 14px; }
+  .row-actions { display: flex; gap: 6px; align-items: center; }
+  tr.editing { background: rgba(94, 234, 212, 0.06); }
+
+  .sub-card {
+    margin-top: 20px;
+    background: #0d131b;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .sub-card h3 { margin: 0 0 4px; font-size: 15px; }
+  .sub-card .muted { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; }
+
+  .list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: rgba(255,255,255,0.02);
+  }
+  .list-item.editing { outline: 1px solid var(--teal); }
+  .list-item .meta { font-size: 12.5px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .icon-btn {
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 4px 6px;
+    border-radius: 6px;
+  }
+  .icon-btn:hover { color: var(--teal); background: rgba(255,255,255,0.04); }
+
+  .edit-form { margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; }
+  .edit-form.hidden { display: none; }
+  .edit-form label.muted { color: var(--muted); font-size: 12.5px; }
+  .edit-form input[type=text] { width: 100%; margin-top: 4px; }
+
+  .msg {
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(94, 234, 212, 0.08);
+    color: var(--teal);
+    font-size: 13.5px;
+  }
+  .err {
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255, 107, 107, 0.1);
+    color: var(--danger);
+    font-size: 13.5px;
+  }
+  .empty { color: var(--muted); padding: 16px 4px; font-size: 13.5px; }
+
+  @media (max-width: 480px) {
+    .field { grid-template-columns: 1fr; }
+    .term-body { padding: 20px 18px 24px; }
+  }
+
+  @media (max-width: 1000px) {
+    .page-wrap { flex-direction: column; }
+    .col-left, .col-right { max-width: 100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .terminal, .cursor-blink, .pulse { animation: none !important; }
+    .terminal { opacity: 1; transform: none; }
+  }
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="main">
-      <div class="card">
-        <h1>ฐานข้อมูลงาน — นักศึกษา</h1>
-        <p class="lead">ดู / เพิ่ม / แก้ไข / ลบ ข้อมูลนักศึกษาได้จากหน้านี้</p>
+  <div class="glow"></div>
+
+  <div class="page-wrap">
+
+    <!-- ===== ฝั่งซ้าย: terminal/intro เดิม ===== -->
+    <div class="col-left">
+      <main class="terminal">
+        <div class="titlebar">
+          <div class="dots">
+            <span class="dot r"></span>
+            <span class="dot y"></span>
+            <span class="dot g"></span>
+          </div>
+          <span class="titlebar-label">bash — node server.js</span>
+        </div>
+
+        <div class="term-body">
+          <div class="line"><span class="prompt">$</span><span class="cmd">node server.js</span></div>
+          <div class="line out-muted">&gt; กำลังเริ่มต้น Express server...</div>
+          <div class="line out-ok">✓ เชื่อมต่อสำเร็จ — พร้อมรับ request แล้ว</div>
+
+          <hr class="divider">
+
+          <div class="hero">
+            <h1>ยินดีต้อนรับสู่ Server ของผมครับ<span class="cursor-blink" aria-hidden="true"></span></h1>
+            <p>นี่คือ Web Server เครื่องแรกที่สร้างขึ้นเองด้วย Node.js และ Express</p>
+          </div>
+
+          <div class="card">
+            <div class="card-eyebrow">ข้อมูลนักศึกษา</div>
+            <div class="field">
+              <span class="k">รหัสนักศึกษา</span>
+              <span class="v">69319011766</span>
+            </div>
+            <div class="field">
+              <span class="k">ชื่อ-นามสกุล</span>
+              <span class="v">นายพงศกร ผาบจันทร์สิงห์</span>
+            </div>
+          </div>
+
+          <div class="badges">
+            <span class="badge"><span class="pulse"></span>server: online</span>
+            <span class="badge">runtime: node.js</span>
+            <span class="badge">framework: express</span>
+            <span class="badge">เวลาปัจจุบัน: <span id="clockOut">--:--:--</span></span>
+          </div>
+
+          <div class="card video-card">
+            <div class="card-eyebrow">คลิปปั่นๆ ประจำวัน</div>
+            <div class="video-frame">
+              <iframe
+                id="vibeVideo"
+                src=""
+                title="คลิปปั่นๆ"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                loading="lazy">
+              </iframe>
+            </div>
+            <div class="actions">
+              <button class="btn primary" id="reshuffleBtn" type="button">สุ่มคลิปใหม่</button>
+            </div>
+          </div>
+
+          <div class="footer-line">
+            <span>ส่งงาน CS Web Programming</span>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- ===== ฝั่งขวา: กล่อง CRUD ฐานข้อมูลนักศึกษา ===== -->
+    <div class="col-right">
+      <div class="crud-card">
+        <h2>ฐานข้อมูลงาน — นักศึกษา</h2>
+        <p class="lead">ดู / เพิ่ม / แก้ไข / ลบ ข้อมูลนักศึกษาได้จากกล่องนี้</p>
         ${msg ? `<div class="msg">${escapeHtml(msg)}</div>` : ''}
         <div id="loadError"></div>
 
         <form id="addForm" class="form-row" autocomplete="off">
           <input id="add_student_id" name="student_id" type="text" placeholder="รหัสนักศึกษา (เช่น 69319011766)" required>
           <input id="add_student_name" name="student_name" type="text" placeholder="ชื่อ-นามสกุล" required>
-          <button class="btn" type="submit">เพิ่ม</button>
+          <button class="btn primary" type="submit">เพิ่ม</button>
         </form>
 
         <table aria-label="students">
@@ -131,49 +636,121 @@ app.get('/', async (req, res) => {
             <tr><td colspan="3" class="empty">กำลังโหลดข้อมูล...</td></tr>
           </tbody>
         </table>
+
+        <div class="sub-card">
+          <h3>รายชื่อ (รวดเร็ว)</h3>
+          <p class="muted">คลิก ✏️ เพื่อแก้ไขทางด่วน</p>
+          <div id="listContainer">
+            <div class="empty">กำลังโหลดข้อมูล...</div>
+          </div>
+
+          <div class="edit-form hidden" id="editFormArea">
+            <h4 style="margin:0 0 8px">แก้ไขข้อมูล: <span id="editingLabel"></span></h4>
+            <form id="editForm">
+              <input type="hidden" name="original_student_id" id="edit_original_student_id">
+              <div>
+                <label class="muted" for="edit_student_id">รหัสนักศึกษา</label>
+                <input id="edit_student_id" name="student_id" type="text" placeholder="รหัสนักศึกษา" required>
+              </div>
+              <div style="margin-top:8px">
+                <label class="muted" for="edit_student_name">ชื่อ-นามสกุล</label>
+                <input id="edit_student_name" name="student_name" type="text" placeholder="ชื่อ-นามสกุล" required>
+              </div>
+              <div style="margin-top:10px;display:flex;gap:8px">
+                <button type="submit" class="btn primary" id="saveEditBtn">บันทึก</button>
+                <button type="button" id="cancelEdit" class="btn">ยกเลิก</button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
 
-    <aside class="sidebar">
-      <div class="card">
-        <h3>รายชื่อ (รวดเร็ว)</h3>
-        <p class="muted">คลิก ✏️ เพื่อแก้ไขทางด่วน</p>
-        <div id="listContainer">
-          <div class="empty">กำลังโหลดข้อมูล...</div>
-        </div>
-
-        <div class="edit-form hidden" id="editFormArea">
-          <h4>แก้ไขข้อมูล: <span id="editingLabel"></span></h4>
-          <form id="editForm">
-            <input type="hidden" name="original_student_id" id="edit_original_student_id">
-            <div>
-              <label class="muted" for="edit_student_id">รหัสนักศึกษา</label>
-              <input id="edit_student_id" name="student_id" type="text" placeholder="รหัสนักศึกษา" required
-                style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;margin-top:4px">
-            </div>
-            <div style="margin-top:8px">
-              <label class="muted" for="edit_student_name">ชื่อ-นามสกุล</label>
-              <input id="edit_student_name" name="student_name" type="text" placeholder="ชื่อ-นามสกุล" required
-                style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;margin-top:4px">
-            </div>
-            <div style="margin-top:10px;display:flex;gap:8px">
-              <button type="submit" class="btn" id="saveEditBtn">บันทึก</button>
-              <button type="button" id="cancelEdit" class="btn" style="background:#888;color:#fff">ยกเลิก</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </aside>
   </div>
 
   <script>
-    // ---------- state ----------
+    // นาฬิกาเรียลไทม์
+    function tick() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('clockOut').textContent = h + ':' + m + ':' + s;
+    }
+    tick();
+    setInterval(tick, 1000);
+
+    // โหมด Matrix — ฝนตัวอักษรบน canvas พื้นหลัง (เปิดอัตโนมัติทันทีที่โหลดหน้า)
+    let matrixCanvas, matrixCtx, matrixInterval;
+
+    function startMatrix() {
+      matrixCanvas = document.createElement('canvas');
+      matrixCanvas.style.position = 'fixed';
+      matrixCanvas.style.top = '0';
+      matrixCanvas.style.left = '0';
+      matrixCanvas.style.width = '100vw';
+      matrixCanvas.style.height = '100vh';
+      matrixCanvas.style.zIndex = '0';
+      matrixCanvas.style.opacity = '0.5';
+      matrixCanvas.width = window.innerWidth;
+      matrixCanvas.height = window.innerHeight;
+      document.body.appendChild(matrixCanvas);
+      matrixCtx = matrixCanvas.getContext('2d');
+
+      const chars = 'アイウエオカキクケコ01アルゴリズムEXPRESS';
+      const fontSize = 15;
+      const columns = Math.floor(matrixCanvas.width / fontSize);
+      const drops = new Array(columns).fill(1);
+
+      matrixInterval = setInterval(() => {
+        matrixCtx.fillStyle = 'rgba(10, 14, 20, 0.08)';
+        matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+        matrixCtx.fillStyle = '#5eead4';
+        matrixCtx.font = fontSize + 'px monospace';
+        for (let i = 0; i < drops.length; i++) {
+          const text = chars[Math.floor(Math.random() * chars.length)];
+          matrixCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+          if (drops[i] * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+            drops[i] = 0;
+          }
+          drops[i]++;
+        }
+      }, 45);
+    }
+    startMatrix();
+
+    window.addEventListener('resize', () => {
+      if (matrixCanvas) {
+        matrixCanvas.width = window.innerWidth;
+        matrixCanvas.height = window.innerHeight;
+      }
+    });
+
+    // คลิปปั่นๆ — สุ่มวิดีโอ YouTube จากลิสต์ แล้วฝัง embed (ไม่ต้องใช้ API key)
+    const vibeClips = [
+      'dQw4w9WgXcQ', // Rick Astley - Never Gonna Give You Up
+      'y6120QOlsfU', // Darude - Sandstorm
+      'FtutLA63Cp8', // Baby Shark Dance
+      'PGNiXGX2nLU', // Trololo — Eduard Khil
+      'oHg5SJYRHA0', // RickRoll'D remix (Numa Numa era clip)
+      'Sagg08DrO5U', // Harlem Shake
+      'jofNR_WkoCE'  // Chocolate Rain
+    ];
+
+    function loadRandomClip() {
+      const iframe = document.getElementById('vibeVideo');
+      const pick = vibeClips[Math.floor(Math.random() * vibeClips.length)];
+      iframe.src = 'https://www.youtube.com/embed/' + pick + '?autoplay=1&mute=1';
+    }
+    loadRandomClip();
+    document.getElementById('reshuffleBtn').addEventListener('click', loadRandomClip);
+
+    // ================= CRUD (ฝั่งขวา) =================
     let students = [];       // แหล่งข้อมูลเดียวที่ใช้ render ทั้งตารางและ sidebar
     let editingId = null;    // id ที่กำลังแก้ไขอยู่ (ถ้ามี)
 
-    // ---------- helpers ----------
-    function escapeHtml(str){ return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-    function escapeAttr(str){ return escapeHtml(str); }
+    function escapeHtmlClient(str){ return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function escapeAttrClient(str){ return escapeHtmlClient(str); }
 
     async function fetchStudents() {
       const res = await fetch('/api/students');
@@ -188,11 +765,10 @@ app.get('/', async (req, res) => {
         renderAll();
       } catch (err) {
         console.error(err);
-        document.getElementById('loadError').innerHTML = '<div class="err">โหลดข้อมูลไม่สำเร็จ: ' + escapeHtml(err.message) + ' — <button class="btn" onclick="refresh()">ลองใหม่</button></div>';
+        document.getElementById('loadError').innerHTML = '<div class="err">โหลดข้อมูลไม่สำเร็จ: ' + escapeHtmlClient(err.message) + ' — <button class="btn" onclick="refresh()">ลองใหม่</button></div>';
       }
     }
 
-    // ---------- render ----------
     function renderAll() {
       renderTable();
       renderSidebar();
@@ -207,12 +783,12 @@ app.get('/', async (req, res) => {
       }
       tbody.innerHTML = students.map(function (s) {
         const isEditing = s.student_id === editingId;
-        return '<tr data-id="' + escapeAttr(s.student_id) + '"' + (isEditing ? ' class="editing"' : '') + '>' +
-          '<td>' + escapeHtml(s.student_id) + '</td>' +
-          '<td>' + escapeHtml(s.student_name) + '</td>' +
+        return '<tr data-id="' + escapeAttrClient(s.student_id) + '"' + (isEditing ? ' class="editing"' : '') + '>' +
+          '<td>' + escapeHtmlClient(s.student_id) + '</td>' +
+          '<td>' + escapeHtmlClient(s.student_name) + '</td>' +
           '<td class="row-actions">' +
-            '<button type="button" class="btn" data-action="edit" data-id="' + escapeAttr(s.student_id) + '">แก้ไข</button>' +
-            '<button type="button" class="btn danger" data-action="del" data-id="' + escapeAttr(s.student_id) + '">ลบ</button>' +
+            '<button type="button" class="btn" data-action="edit" data-id="' + escapeAttrClient(s.student_id) + '">แก้ไข</button>' +
+            '<button type="button" class="btn danger" data-action="del" data-id="' + escapeAttrClient(s.student_id) + '">ลบ</button>' +
           '</td>' +
         '</tr>';
       }).join('');
@@ -226,11 +802,11 @@ app.get('/', async (req, res) => {
       }
       list.innerHTML = students.map(function (s) {
         const isEditing = s.student_id === editingId;
-        return '<div class="list-item' + (isEditing ? ' editing' : '') + '" data-id="' + escapeAttr(s.student_id) + '">' +
-          '<div><div><strong>' + escapeHtml(s.student_name) + '</strong></div><div class="meta">' + escapeHtml(s.student_id) + '</div></div>' +
+        return '<div class="list-item' + (isEditing ? ' editing' : '') + '" data-id="' + escapeAttrClient(s.student_id) + '">' +
+          '<div><div><strong>' + escapeHtmlClient(s.student_name) + '</strong></div><div class="meta">' + escapeHtmlClient(s.student_id) + '</div></div>' +
           '<div>' +
-            '<button type="button" class="icon-btn" data-action="edit" data-id="' + escapeAttr(s.student_id) + '" title="แก้ไข">✏️</button>' +
-            '<button type="button" class="icon-btn" data-action="del" data-id="' + escapeAttr(s.student_id) + '" title="ลบ">🗑️</button>' +
+            '<button type="button" class="icon-btn" data-action="edit" data-id="' + escapeAttrClient(s.student_id) + '" title="แก้ไข">✏️</button>' +
+            '<button type="button" class="icon-btn" data-action="del" data-id="' + escapeAttrClient(s.student_id) + '" title="ลบ">🗑️</button>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -263,7 +839,6 @@ app.get('/', async (req, res) => {
       renderAll();
     }
 
-    // ---------- actions ----------
     async function addStudent(student_id, student_name) {
       const res = await fetch('/add', {
         method: 'POST',
@@ -294,9 +869,6 @@ app.get('/', async (req, res) => {
       if (!data.ok) throw new Error(data.error || 'ลบไม่สำเร็จ');
     }
 
-    // ---------- events ----------
-    // ใช้ event delegation ผูกกับ document ครั้งเดียว ปุ่มที่ render ใหม่กี่ครั้งก็ยังทำงาน
-    // (บั๊กเดิม: การผสม server-render ครั้งแรก + client re-render ทำให้บางปุ่มไม่ได้อยู่ใต้ listener ที่ถูกต้อง)
     document.addEventListener('click', async function (e) {
       const el = e.target.closest('[data-action]');
       if (!el) return;
@@ -369,17 +941,15 @@ app.get('/', async (req, res) => {
 
     document.getElementById('cancelEdit').addEventListener('click', stopEdit);
 
-    // ---------- init ----------
+    // init
     refresh();
     setInterval(function () {
-      // อย่า refresh ทับตอนกำลังพิมพ์แก้ไขอยู่ ไม่งั้นฟอร์มจะโดนรีเซ็ตกลางคัน
       if (!editingId) refresh();
     }, 30000);
   </script>
 </body>
-</html>`;
-
-  res.send(html);
+</html>
+  `);
 });
 
 // เพิ่มนักศึกษา (รับได้ทั้ง form POST เดิม และ JSON จาก fetch)
